@@ -1,8 +1,18 @@
-from textblob import TextBlob
+import yfinance as yf
+import pandas as pd
+import numpy as np
 import requests
 from bs4 import BeautifulSoup
+from textblob import TextBlob
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
 
-
+def get_stock_data(ticker, start, end):
+    stock = yf.Ticker(ticker)
+    df = stock.history(start=start, end=end)
+    df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
+    return df
 
 def get_news_headlines(ticker):
     url = f"https://finviz.com/quote.ashx?t={ticker}"
@@ -27,14 +37,41 @@ def analyze_sentiment(headlines):
         sentiment = TextBlob(headline).sentiment.polarity
         sentiments.append(sentiment)
     
-    # Average sentiment for the stock
     return sum(sentiments) / len(sentiments) if sentiments else 0
 
+def prepare_data(ticker, start, end):
+    stock_data = get_stock_data(ticker, start, end)
+    headlines = get_news_headlines(ticker)
+    sentiment_score = analyze_sentiment(headlines)
+    stock_data['Sentiment'] = sentiment_score
+    stock_data.dropna(inplace=True)
+    return stock_data
 
+def train_model(stock_data):
+    features = stock_data[['Open', 'High', 'Low', 'Volume', 'Sentiment']]
+    labels = stock_data['Close']
+    X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.2, random_state=42)
+    
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    
+    predictions = model.predict(X_test)
+    mae = mean_absolute_error(y_test, predictions)
+    print(f"Mean Absolute Error: {mae}")
+    
+    return model
 
-# Example: Get Tesla news
-news_headlines = get_news_headlines("TSLA")
+def predict_next_day_price(model, last_data):
+    last_data = last_data[['Open', 'High', 'Low', 'Volume', 'Sentiment']].values.reshape(1, -1)
+    return model.predict(last_data)[0]
 
-# Get sentiment score for Tesla
-sentiment_score = analyze_sentiment(news_headlines)
-print(f"Sentiment Score for TSLA: {sentiment_score}")
+if __name__ == "__main__":
+    ticker = "TSLA"
+    start_date = "2023-01-01"
+    end_date = "2024-01-01"
+    
+    stock_data = prepare_data(ticker, start_date, end_date)
+    model = train_model(stock_data)
+    
+    next_day_price = predict_next_day_price(model, stock_data.iloc[-1])
+    print(f"Predicted Next Day Price for {ticker}: {next_day_price}")
