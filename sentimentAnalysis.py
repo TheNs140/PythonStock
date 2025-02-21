@@ -3,14 +3,19 @@ import pandas as pd
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
-from textblob import TextBlob
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
+import os
+
+nltk.download('vader_lexicon')
+sia = SentimentIntensityAnalyzer()
 
 def get_stock_data(ticker, start, end):
     stock = yf.Ticker(ticker)
-    df = stock.history(start=start, end=end)
+    df = stock.history(period="1mo")
     df = df[['Open', 'High', 'Low', 'Close', 'Volume']]
     return df
 
@@ -32,12 +37,8 @@ def get_news_headlines(ticker):
     return headlines
 
 def analyze_sentiment(headlines):
-    sentiments = []
-    for headline in headlines:
-        sentiment = TextBlob(headline).sentiment.polarity
-        sentiments.append(sentiment)
-    
-    return sum(sentiments) / len(sentiments) if sentiments else 0
+    sentiment_scores = [sia.polarity_scores(h)['compound'] for h in headlines]
+    return sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
 
 def prepare_data(ticker, start, end):
     stock_data = get_stock_data(ticker, start, end)
@@ -66,7 +67,7 @@ def predict_next_day_price(model, last_data):
     return model.predict(last_data)[0]
 
 if __name__ == "__main__":
-    ticker = "TSLA"
+    ticker = "AAPL"
     start_date = "2023-01-01"
     end_date = "2024-01-01"
     
