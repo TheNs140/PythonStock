@@ -1,18 +1,24 @@
+import itertools
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
 from bs4 import BeautifulSoup
 import nltk
+import matplotlib.pyplot as plt
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from sklearn.mixture import GaussianMixture
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error
+from scipy import linalg
 import datetime
 
 nltk.download('vader_lexicon')
 sia = SentimentIntensityAnalyzer()
+color_iter = itertools.cycle(["navy", "c", "cornflowerblue", "gold", "darkorange"])
+
+
 
 def get_stock_data(ticker, start, end):
     stock = yf.Ticker(ticker)
@@ -74,12 +80,23 @@ def train_model(stock_data):
     labels = stock_data['Close']
     X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.2, random_state=42)
 
-    model = GaussianMixture(n_components=2, random_state=0)
-    model.fit(X_train)
+    model = RandomForestRegressor(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
 
+    # Make Predictions
     predictions = model.predict(X_test)
     mae = mean_absolute_error(y_test, predictions)
     print(f"Mean Absolute Error: {mae}")
+
+    # Plot actual vs predicted
+    plt.figure(figsize=(12, 6))
+    plt.plot(y_test.values, label="Actual Price", linestyle="-", marker="o")
+    plt.plot(predictions, label="Predicted Price", linestyle="-", marker="x")
+    plt.xlabel("Test Data Index")
+    plt.ylabel("Stock Closing Price")
+    plt.legend()
+    plt.title("Actual vs Predicted Stock Prices")
+    plt.show()
 
     return model
 
